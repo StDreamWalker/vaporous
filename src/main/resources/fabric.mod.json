@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "vaporous",
+  "version": "${version}",
+  "name": "Vaporous",
+  "description": "An original speedster whose body thins into living vapor the faster he runs. Wall-scaling, air-current riding, momentum strikes, pressure jets, and a time dilation that slows the whole world around you.",
+  "authors": ["You"],
+  "license": "MIT",
+  "icon": "assets/vaporous/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.vaporous.Vaporous"],
+    "client": ["com.vaporous.client.VaporousClient"]
+  },
+  "mixins": ["vaporous.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
