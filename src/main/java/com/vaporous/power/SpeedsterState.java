@@ -9,6 +9,9 @@ public final class SpeedsterState {
     /** 0 = fully dense, 1 = fully vaporous. Reported by the owning client. */
     public float vapor;
 
+    /** Client said the power is holding the body up (flight, wall-run, air currents). */
+    public boolean floating;
+
     public int blastCooldown;
     public int vacuumCooldown;
 

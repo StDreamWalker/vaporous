@@ -146,18 +146,34 @@ public final class SpeedsterManager {
                         SoundCategory.PLAYERS, 1.0f, s.time ? 0.5f : 1.6f);
                 s.markDirty();
             }
-            case VaporPayloads.Ability.PRESSURE_BLAST -> PressureAbilities.blast(player, s, charge);
-            case VaporPayloads.Ability.VACUUM -> PressureAbilities.vacuum(player, s, charge);
+            case VaporPayloads.Ability.PRESSURE_BLAST -> {
+                if (pressureAllowed(s, player)) PressureAbilities.blast(player, s, charge);
+            }
+            case VaporPayloads.Ability.VACUUM -> {
+                if (pressureAllowed(s, player)) PressureAbilities.vacuum(player, s, charge);
+            }
             default -> {
             }
         }
     }
 
-    public static void handleVaporReport(ServerPlayerEntity player, float vapor) {
+    /**
+     * Compressing air takes either slowed time (then even standing still is fine) or real speed.
+     */
+    private static boolean pressureAllowed(SpeedsterState s, ServerPlayerEntity player) {
+        if (TimeDilation.SERVER.active()) return true;
+        // small tolerance for network lag between the client's check and ours
+        if (s.form && s.vapor >= VaporConfig.get().pressureMinVapor - 0.05f) return true;
+        player.sendMessage(Text.translatable("message.vaporous.need_speed").formatted(Formatting.GRAY), true);
+        return false;
+    }
+
+    public static void handleVaporReport(ServerPlayerEntity player, float vapor, boolean floating) {
         SpeedsterState s = STATES.get(player.getUuid());
         if (s == null || !isPowered(player)) return;
         if (Float.isNaN(vapor)) vapor = 0f;
         s.vapor = s.form ? MathHelper.clamp(vapor, 0f, 1f) : 0f;
+        if (floating && s.form) s.floating = true;
     }
 
     // ------------------------------------------------------------------ ticking
@@ -175,6 +191,12 @@ public final class SpeedsterManager {
             if (s.vacuumCooldown > 0) s.vacuumCooldown--;
 
             VaporAttributes.applyServer(p, s.form, s.vapor);
+
+            // Flying, wall-running and riding currents aren't falling: don't build up fall damage.
+            if (s.floating || (s.form && s.vapor >= c.flightVapor - 0.05)) {
+                p.fallDistance = 0f;
+            }
+            s.floating = false;
 
             boolean creative = p.getAbilities().creativeMode || p.isSpectator();
             if (!creative) {

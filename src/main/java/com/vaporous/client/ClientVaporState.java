@@ -21,6 +21,10 @@ public final class ClientVaporState {
     public static boolean time;
     // Local player's vapor level, measured on this client from its own speed.
     public static float vapor;
+    // Local player's movement, for the speedometer (blocks per second).
+    public static double realSpeed;
+    public static double perceivedSpeed;
+    public static boolean flying;
 
     private static long lastTickNanos = System.nanoTime();
 
@@ -69,6 +73,9 @@ public final class ClientVaporState {
         form = false;
         time = false;
         vapor = 0f;
+        realSpeed = 0.0;
+        perceivedSpeed = 0.0;
+        flying = false;
         TimeDilation.CLIENT.reset();
     }
 }

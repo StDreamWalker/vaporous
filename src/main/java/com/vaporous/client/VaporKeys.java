@@ -2,6 +2,7 @@ package com.vaporous.client;
 
 import com.vaporous.VaporConfig;
 import com.vaporous.net.VaporPayloads;
+import com.vaporous.time.TimeDilation;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -16,6 +17,7 @@ import org.lwjgl.glfw.GLFW;
  * Z – toggle time dilation
  * R – hold to compress, release to fire a Pressure Jet (sneak + look down to jet upward)
  * G – hold to compress, release to open a Vacuum Well (sneak to open it right in front of you)
+ * R and G need either slowed time (standing still is fine) or real speed (density 50% or lower).
  * All rebindable under Options > Controls > Key Binds > Vaporous.
  */
 public final class VaporKeys {
@@ -28,6 +30,8 @@ public final class VaporKeys {
 
     public static int blastHold;
     public static int vacuumHold;
+    /** Ticks left to show the "not fast enough" hint. */
+    public static int needSpeedHint;
     private static int blastCooldown;
 
     private VaporKeys() {}
@@ -54,8 +58,17 @@ public final class VaporKeys {
         while (time.wasPressed()) send(VaporPayloads.Ability.TOGGLE_TIME, 0f);
 
         boolean canCharge = mc.currentScreen == null;
+        if (needSpeedHint > 0) needSpeedHint--;
 
-        if (canCharge && blast.isPressed()) {
+        // Compressing air needs either slowed time (then standing still is fine) or real speed.
+        boolean pressureReady = pressureAllowed();
+        if (canCharge && !pressureReady && (blast.isPressed() || vacuum.isPressed())) {
+            needSpeedHint = 30;
+            blastHold = 0;
+            vacuumHold = 0;
+        }
+
+        if (canCharge && pressureReady && blast.isPressed()) {
             blastHold = Math.min(blastHold + 1, MAX_CHARGE_TICKS);
         } else if (blastHold > 0) {
             float charge = blastHold / (float) MAX_CHARGE_TICKS;
@@ -73,13 +86,18 @@ public final class VaporKeys {
             }
         }
 
-        if (canCharge && vacuum.isPressed()) {
+        if (canCharge && pressureReady && vacuum.isPressed()) {
             vacuumHold = Math.min(vacuumHold + 1, MAX_CHARGE_TICKS);
         } else if (vacuumHold > 0) {
             float charge = vacuumHold / (float) MAX_CHARGE_TICKS;
             vacuumHold = 0;
             send(VaporPayloads.Ability.VACUUM, charge);
         }
+    }
+
+    public static boolean pressureAllowed() {
+        return TimeDilation.CLIENT.active()
+                || (ClientVaporState.form && ClientVaporState.vapor >= VaporConfig.get().pressureMinVapor);
     }
 
     private static void send(int ability, float charge) {

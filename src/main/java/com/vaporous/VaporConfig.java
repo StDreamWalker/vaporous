@@ -42,6 +42,16 @@ public final class VaporConfig {
     /** Stops the speed boost from stretching your field of view to the max. */
     public boolean capFov = true;
 
+    // ---------- Slipstream flight (density 0-20%) ----------
+    /** Vapor needed to fly (0.8 = density 20% or lower). */
+    public double flightVapor = 0.8;
+    /** Cruising flight speed at 100% vapor, in blocks per tick (3.0 = 60 blocks/s). */
+    public double flightSpeed = 3.0;
+    /** How quickly your flight path bends toward where you're looking (0-1). Lower = more momentum. */
+    public double flightTurnRate = 0.18;
+    /** Look at least this many degrees upward while running to take off from the ground. */
+    public float takeoffPitch = 12f;
+
     // ---------- Momentum combat (server) ----------
     /** Extra melee damage at 100% vapor. */
     public double momentumDamage = 8.0;
@@ -55,6 +65,11 @@ public final class VaporConfig {
     public double safeFallBonus = 14.0;
 
     // ---------- Pressure attacks (server) ----------
+    /**
+     * Outside of slowed time you can only compress air while already moving fast: this much vapor
+     * (0.5 = density 50% or lower). Inside slowed time you can use them even standing still.
+     */
+    public float pressureMinVapor = 0.5f;
     public float blastDamage = 7.0f;
     public float blastVaporBonus = 5.0f;
     public double blastRange = 24.0;
@@ -79,6 +94,11 @@ public final class VaporConfig {
     // ---------- Energy cost ----------
     public float speedHungerCost = 0.012f;
     public float timeHungerCost = 0.035f;
+
+    // ---------- Speedometer (client) ----------
+    public boolean showSpeedometer = true;
+    /** "mph", "kmh" or "bps" (blocks per second). 1 block = 1 metre. */
+    public String speedUnits = "mph";
 
     // ---------- Vapor trail visuals (client) ----------
     /** Multiplier for how many vapor wisps are emitted. 0 disables the trail. */
@@ -137,6 +157,9 @@ public final class VaporConfig {
         if (maxTimeFactor < baseTimeFactor) maxTimeFactor = baseTimeFactor;
         if (maxTimeFactor > 60) maxTimeFactor = 60;
         if (trailColor == null) trailColor = "#DCE6EE";
+        if (speedUnits == null) speedUnits = "mph";
+        flightVapor = Math.max(0.05, Math.min(1.0, flightVapor));
+        flightTurnRate = Math.max(0.01, Math.min(1.0, flightTurnRate));
         trailAlpha = Math.max(0.02f, Math.min(1f, trailAlpha));
     }
 }

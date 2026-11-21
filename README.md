@@ -31,12 +31,22 @@ You can also open the folder in IntelliJ IDEA and import it as a Gradle project.
 |---|---|
 | **V** | Toggle **Vapor Form**, the speed power |
 | **Z** | Toggle **Time Dilation** |
-| **R** (hold, then release) | **Pressure Jet**: positive-pressure blast. Hold longer to compress it harder. Sneak and look down while firing to jet yourself into the air. |
-| **G** (hold, then release) | **Vacuum Well**: negative-pressure pocket where you're looking. It pulls mobs and items in, takes the air out of their lungs, then collapses with a thunderclap. Sneak to open it right in front of you. |
+| **R** (hold, then release)* | **Pressure Jet**: positive-pressure blast. Hold longer to compress it harder. Sneak and look down while firing to jet yourself into the air. |
+| **G** (hold, then release)* | **Vacuum Well**: negative-pressure pocket where you're looking. It pulls mobs and items in, takes the air out of their lungs, then collapses with a thunderclap. Sneak to open it right in front of you. |
 | Sprint | Builds momentum. Your body only thins out properly at a full sprint. |
 | Sneak (on the ground) | Condense back down on purpose |
 | Hold Jump (in the air) | Ride air currents |
 | Push into a wall | Run up it. Sneak to cling in place. |
+| At density 20% or lower: hold forward and look up | **Slipstream flight**: you fly wherever you're looking. Look down at the ground to land, let go of forward to coast on your momentum, or sneak to drop. |
+
+\* **R and G need speed or slowed time.** In normal time you can only compress air while you're already moving fast (density 50% or lower). With Time Dilation on, you can use them even standing still.
+
+## Speedometer
+A dial in the bottom-right shows your speed (mph by default, or km/h or blocks/s in the config). It uses a log scale, so walking, sprinting and supersonic speeds all fit.
+
+You always run at the same *real* speed, but with time slowed the world sees you cover ground N times faster. The speedometer shows that **perceived** speed, which is your real speed × the time factor. A 130 mph sprint in 1/20 time reads about 2,600 mph, or Mach 3.4.
+
+While time is slowed, the dial gets a cyan rim and shows "PERCEIVED ×N", and the needle can swing into the cyan zone past 150 mph that you can't reach in normal time. A MACH readout appears near the sound barrier.
 
 ## What each ability does
 **Vapor trail.** Thousands of translucent wisps made from vanilla's soft dust/smoke sprites. Each one billows outward, curls, rises and fades. Wisps are seeded along the whole path you covered each tick, so the trail stays one solid ribbon even at 60+ blocks/second. Colour, opacity and density are in the config.
@@ -44,6 +54,7 @@ You can also open the folder in IntelliJ IDEA and import it as a Gradle project.
 **Density goes down as velocity goes up.** The mod measures your real ground speed and turns it into a 0–100% vapor level, shown as the *Density* gauge on the HUD. Vapor raises movement speed, jump strength and safe-fall distance, and lowers gravity and fall damage. Since more speed means more vapor and more vapor means more speed, a full sprint keeps accelerating, from about 11 to about 60 blocks/second, over a few seconds.
 
 **Gets stronger as he thins:**
+- Slipstream flight at 80% vapor or more (density 20% or lower). You fly with your momentum along your view: speed builds and bleeds off gradually, and turns bank smoothly instead of snapping. Airspeed keeps your body thin, so you can stay up as long as you keep pushing forward. Flying, wall-running and riding currents don't build up fall damage.
 - Wall-running above 25% vapor
 - Riding air currents above 35% vapor. Holding jump caps your fall speed and keeps your momentum. The wind slowly shifts direction, grows stronger with altitude and storms, and pushes you along. Fire, lava, magma and lit campfires below you create **thermals** that lift you.
 

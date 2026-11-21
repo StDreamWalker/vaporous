@@ -30,11 +30,16 @@ public final class VaporPayloads {
         }
     }
 
-    /** The owning client measures its own speed and reports how vaporous it currently is. */
-    public record VaporReport(float vapor) implements CustomPayload {
+    /**
+     * The owning client measures its own speed and reports how vaporous it currently is, and whether
+     * the power is holding it up this tick (flying, wall-running, riding currents) so the server
+     * doesn't count that as falling.
+     */
+    public record VaporReport(float vapor, boolean floating) implements CustomPayload {
         public static final Id<VaporReport> ID = new Id<>(Vaporous.id("vapor_report"));
         public static final PacketCodec<RegistryByteBuf, VaporReport> CODEC = PacketCodec.tuple(
                 PacketCodecs.FLOAT, VaporReport::vapor,
+                PacketCodecs.BOOL, VaporReport::floating,
                 VaporReport::new);
 
         @Override

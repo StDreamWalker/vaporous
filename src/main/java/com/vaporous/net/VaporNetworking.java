@@ -23,7 +23,7 @@ public final class VaporNetworking {
         });
         ServerPlayNetworking.registerGlobalReceiver(VaporPayloads.VaporReport.ID, (payload, context) -> {
             ServerPlayerEntity player = context.player();
-            player.server.execute(() -> SpeedsterManager.handleVaporReport(player, payload.vapor()));
+            player.server.execute(() -> SpeedsterManager.handleVaporReport(player, payload.vapor(), payload.floating()));
         });
     }
 

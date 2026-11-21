@@ -1,32 +1,34 @@
 {
   "item.vaporous.living_mist_phial": "Phial of Living Mist",
-
   "key.vaporous.form": "Toggle Vapor Form",
   "key.vaporous.time": "Toggle Time Dilation",
   "key.vaporous.blast": "Pressure Jet (hold to charge)",
   "key.vaporous.vacuum": "Vacuum Well (hold to charge)",
   "category.vaporous": "Vaporous",
-
   "hud.vaporous.form_on": "VAPOR FORM",
   "hud.vaporous.form_off": "Solid",
   "hud.vaporous.time": "Time ×1/%s",
   "hud.vaporous.density": "Density %s",
   "hud.vaporous.charge_blast": "Compressing",
   "hud.vaporous.charge_vacuum": "Rarefying",
-
   "message.vaporous.awakened": "Your body loosens at the edges. Press V to let it run.",
   "message.vaporous.already": "The mist settles back into you. You're already vaporous.",
   "message.vaporous.too_hungry": "Too drained to slip out of time.",
   "message.vaporous.time_exhausted": "Exhausted, you fall back into normal time.",
-
   "command.vaporous.granted": "Made %s player(s) vaporous",
   "command.vaporous.revoked": "Condensed %s player(s) back to normal",
   "command.vaporous.reloaded": "Reloaded config/vaporous.json",
-
   "death.attack.vaporous.pressure_jet": "%1$s was torn apart by %2$s's pressure jet",
   "death.attack.vaporous.pressure_jet.item": "%1$s was torn apart by %2$s's pressure jet using %3$s",
   "death.attack.vaporous.pressure_jet.player": "%1$s was blasted by compressed air whilst fighting %2$s",
   "death.attack.vaporous.vacuum_collapse": "%1$s had the air pulled out of them by %2$s",
   "death.attack.vaporous.vacuum_collapse.item": "%1$s had the air pulled out of them by %2$s using %3$s",
-  "death.attack.vaporous.vacuum_collapse.player": "%1$s suffocated in a vacuum whilst fighting %2$s"
+  "death.attack.vaporous.vacuum_collapse.player": "%1$s suffocated in a vacuum whilst fighting %2$s",
+  "hud.vaporous.flying": "SLIPSTREAM",
+  "hud.vaporous.perceived": "PERCEIVED ×%s",
+  "hud.vaporous.unit.mph": "MPH",
+  "hud.vaporous.unit.kmh": "KM/H",
+  "hud.vaporous.unit.bps": "BLOCKS/S",
+  "hud.vaporous.need_speed": "Not fast enough to compress air",
+  "message.vaporous.need_speed": "Build speed (density 50% or lower) or slow time to compress the air."
 }
