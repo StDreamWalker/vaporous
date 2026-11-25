@@ -32,16 +32,17 @@ public final class VaporAttributes {
     private VaporAttributes() {}
 
     /** Client side: run on the locally controlled player every tick. */
-    public static void applyClient(LivingEntity p, boolean form, float vapor) {
+    public static void applyClient(LivingEntity p, boolean form, float vapor, VaporConfig.FormStats stats) {
         VaporConfig c = VaporConfig.get();
         set(p, EntityAttributes.GENERIC_MOVEMENT_SPEED, SPEED,
-                form ? c.baseSpeedBonus + vapor * c.maxSpeedBonus : 0.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+                form ? stats.baseSpeedBonus + vapor * stats.maxSpeedBonus : 0.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE);
         set(p, EntityAttributes.GENERIC_JUMP_STRENGTH, JUMP,
                 form ? vapor * c.jumpBonus : 0.0, EntityAttributeModifier.Operation.ADD_VALUE);
         set(p, EntityAttributes.GENERIC_GRAVITY, GRAVITY,
                 form ? -vapor * c.gravityReduction : 0.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        // The faster you go, the taller the ledges you flow up without jumping.
         set(p, EntityAttributes.GENERIC_STEP_HEIGHT, STEP,
-                form ? c.stepHeightBonus : 0.0, EntityAttributeModifier.Operation.ADD_VALUE);
+                form ? c.stepHeightBonus + vapor * c.maxStepHeightBonus : 0.0, EntityAttributeModifier.Operation.ADD_VALUE);
     }
 
     /** Server side: run on every powered player every tick. */
@@ -49,8 +50,10 @@ public final class VaporAttributes {
         VaporConfig c = VaporConfig.get();
         // Quantise so the attribute only changes (and re-syncs) in 5% steps.
         double q = Math.round(vapor * 20.0) / 20.0;
+        // Kept a little above the client's value so the server never rejects a step the client took.
         set(p, EntityAttributes.GENERIC_STEP_HEIGHT, STEP,
-                form ? c.stepHeightBonus : 0.0, EntityAttributeModifier.Operation.ADD_VALUE);
+                form ? c.stepHeightBonus + Math.min(1.0, q + 0.15) * c.maxStepHeightBonus : 0.0,
+                EntityAttributeModifier.Operation.ADD_VALUE);
         set(p, EntityAttributes.GENERIC_SAFE_FALL_DISTANCE, SAFE_FALL,
                 form ? c.safeFallBonus * (0.25 + 0.75 * q) : 0.0, EntityAttributeModifier.Operation.ADD_VALUE);
         set(p, EntityAttributes.GENERIC_FALL_DAMAGE_MULTIPLIER, FALL_DAMAGE,
@@ -68,7 +71,7 @@ public final class VaporAttributes {
     }
 
     public static void clearClient(LivingEntity p) {
-        applyClient(p, false, 0f);
+        applyClient(p, false, 0f, VaporConfig.get().vapor);
     }
 
     private static void set(LivingEntity e, RegistryEntry<EntityAttribute> attribute, Identifier id,

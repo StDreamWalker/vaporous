@@ -22,6 +22,8 @@ public final class VaporClientController {
         VaporConfig c = VaporConfig.get();
 
         VaporKeys.handle(mc, p);
+        ProjectileHands.tick(mc, p);
+        VaporConfig.FormStats stats = ClientVaporState.stats();
 
         // Real speed this tick (prevX/Y/Z hold where the player started the tick).
         double dx = p.getX() - p.prevX;
@@ -29,7 +31,7 @@ public final class VaporClientController {
         double dz = p.getZ() - p.prevZ;
         double groundBps = Math.sqrt(dx * dx + dz * dz) * 20.0;
         double totalBps = Math.sqrt(dx * dx + dy * dy + dz * dz) * 20.0;
-        if (totalBps > 400.0) totalBps = 0.0; // a teleport, not running
+        if (totalBps > 450.0) totalBps = 0.0; // a teleport, not running
         updateSpeedometer(totalBps);
 
         boolean active = ClientVaporState.powered && ClientVaporState.form && !p.isSpectator();
@@ -38,21 +40,21 @@ public final class VaporClientController {
             float v = ClientVaporState.vapor;
             if (VaporMovement.isFlying()) {
                 // In flight, airspeed keeps the body thin, the same way ground speed does.
-                float target = speedToVapor(totalBps, c);
+                float target = speedToVapor(totalBps, stats);
                 v += (float) ((target - v) * (target > v ? c.vaporBuildRate : c.vaporDecayRate * 0.5));
             } else if (!p.isOnGround()) {
                 // Airborne or scaling a wall: momentum (and therefore vapor) is held, fading only slowly.
                 v -= 0.002f;
             } else {
-                float target = speedToVapor(groundBps, c);
+                float target = speedToVapor(groundBps, stats);
                 if (p.isSneaking()) target = 0f;                             // sneak to re-condense on purpose
                 else if (!p.isSprinting()) target = Math.min(target, 0.1f);  // real thinning needs a full sprint
                 v += (float) ((target - v) * (target > v ? c.vaporBuildRate : c.vaporDecayRate));
             }
             ClientVaporState.vapor = MathHelper.clamp(v, 0f, 1f);
 
-            VaporAttributes.applyClient(p, true, ClientVaporState.vapor);
-            floating = VaporMovement.tick(p, ClientVaporState.vapor);
+            VaporAttributes.applyClient(p, true, ClientVaporState.vapor, stats);
+            floating = VaporMovement.tick(p, ClientVaporState.vapor, stats);
         } else {
             ClientVaporState.vapor = 0f;
             VaporMovement.stop();
@@ -76,8 +78,8 @@ public final class VaporClientController {
         VaporTrail.tick(mc);
     }
 
-    private static float speedToVapor(double bps, VaporConfig c) {
-        return (float) MathHelper.clamp((bps - 6.0) / (c.fullVaporSpeed - 6.0), 0.0, 1.0);
+    private static float speedToVapor(double bps, VaporConfig.FormStats stats) {
+        return (float) MathHelper.clamp((bps - 6.0) / (stats.fullVaporSpeed - 6.0), 0.0, 1.0);
     }
 
     /**

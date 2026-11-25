@@ -12,37 +12,31 @@ import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Server-side brain: who is a speedster, what is switched on, and the global time factor. */
+/** Server-side brain: who is a speedster (and which kind), what is switched on, and the global time factor. */
 public final class SpeedsterManager {
 
-    /** Saved on the player and kept through death. */
-    public static AttachmentType<Boolean> POWERED;
+    /** Which phial the player drank (see {@link Variant}). Saved on the player and kept through death. */
+    public static AttachmentType<Integer> VARIANT;
+    /** Older saves stored a simple yes/no; still read so existing speedsters keep their powers. */
+    private static AttachmentType<Boolean> LEGACY_POWERED;
 
     private static final Map<UUID, SpeedsterState> STATES = new HashMap<>();
     private static int factorChangeCooldown;
@@ -50,7 +44,11 @@ public final class SpeedsterManager {
     private SpeedsterManager() {}
 
     public static void init() {
-        POWERED = AttachmentRegistry.<Boolean>create(Vaporous.id("powered"), builder -> builder
+        VARIANT = AttachmentRegistry.<Integer>create(Vaporous.id("variant"), builder -> builder
+                .persistent(Codec.INT)
+                .copyOnDeath()
+                .initializer(() -> Variant.NONE));
+        LEGACY_POWERED = AttachmentRegistry.<Boolean>create(Vaporous.id("powered"), builder -> builder
                 .persistent(Codec.BOOL)
                 .copyOnDeath()
                 .initializer(() -> Boolean.FALSE));
@@ -73,6 +71,8 @@ public final class SpeedsterManager {
                 s.form = false;
                 s.time = false;
                 s.vapor = 0f;
+                s.lastPos = null;
+                s.motion = Vec3d.ZERO;
                 s.markDirty();
             }
         });
@@ -82,47 +82,71 @@ public final class SpeedsterManager {
             TimeDilation.SERVER.reset();
         });
 
-        AttackEntityCallback.EVENT.register(SpeedsterManager::onAttack);
         PressureAbilities.init();
+        MomentumCombat.init();
     }
 
     // ------------------------------------------------------------------ queries
 
+    public static int variant(ServerPlayerEntity player) {
+        Integer v = player.getAttached(VARIANT);
+        int variant = v == null ? Variant.NONE : v;
+        if (variant == Variant.NONE) {
+            Boolean legacy = player.getAttached(LEGACY_POWERED);
+            if (legacy != null && legacy) {
+                player.setAttached(VARIANT, Variant.VAPOR);
+                player.removeAttached(LEGACY_POWERED);
+                return Variant.VAPOR;
+            }
+        }
+        return Variant.isValid(variant) ? variant : Variant.NONE;
+    }
+
     public static boolean isPowered(ServerPlayerEntity player) {
-        Boolean b = player.getAttached(POWERED);
-        return b != null && b;
+        return variant(player) != Variant.NONE;
     }
 
     public static SpeedsterState state(ServerPlayerEntity player) {
         return STATES.computeIfAbsent(player.getUuid(), u -> new SpeedsterState());
     }
 
+    /** The live state, or null if this player isn't a speedster. */
     @Nullable
     public static SpeedsterState stateIfPowered(ServerPlayerEntity player) {
         return isPowered(player) ? state(player) : null;
     }
 
+    public static VaporConfig.FormStats stats(ServerPlayerEntity player) {
+        return VaporConfig.get().stats(variant(player));
+    }
+
     // ------------------------------------------------------------------ mutation
 
-    public static void setPowered(ServerPlayerEntity player, boolean powered) {
-        player.setAttached(POWERED, powered);
+    /** Make a player a speedster of the given variant, or {@link Variant#NONE} to take the powers away. */
+    public static void setVariant(ServerPlayerEntity player, int variant) {
+        if (!Variant.isValid(variant)) variant = Variant.NONE;
+        player.setAttached(VARIANT, variant);
+        player.removeAttached(LEGACY_POWERED);
         SpeedsterState s = state(player);
-        if (!powered) {
+        if (variant == Variant.NONE) {
             s.form = false;
             s.time = false;
             s.vapor = 0f;
             VaporAttributes.clearServer(player);
         }
+        s.markDirty();
         broadcast(player, s);
-        if (!powered) STATES.remove(player.getUuid());
+        if (variant == Variant.NONE) STATES.remove(player.getUuid());
     }
 
     public static void handleAbility(ServerPlayerEntity player, int ability, float charge) {
-        if (!isPowered(player) || player.isSpectator() || !player.isAlive()) return;
+        int variant = variant(player);
+        if (variant == Variant.NONE || player.isSpectator() || !player.isAlive()) return;
         if (Float.isNaN(charge)) charge = 0f;
         charge = MathHelper.clamp(charge, 0f, 1f);
         SpeedsterState s = state(player);
         ServerWorld world = player.getServerWorld();
+        VaporConfig.FormStats stats = VaporConfig.get().stats(variant);
 
         switch (ability) {
             case VaporPayloads.Ability.TOGGLE_FORM -> {
@@ -130,36 +154,33 @@ public final class SpeedsterManager {
                 if (!s.form) s.vapor = 0f;
                 world.playSound(null, player.getX(), player.getY(), player.getZ(),
                         s.form ? SoundEvents.ENTITY_BREEZE_CHARGE : SoundEvents.BLOCK_FIRE_EXTINGUISH,
-                        SoundCategory.PLAYERS, 0.8f, s.form ? 1.4f : 1.2f);
-                world.spawnParticles(VaporRegistry.VAPOR, player.getX(), player.getBodyY(0.5), player.getZ(),
+                        SoundCategory.PLAYERS, 0.8f, s.form ? (variant == Variant.PLASMA ? 1.9f : 1.4f) : 1.2f);
+                world.spawnParticles(VaporRegistry.particleFor(variant), player.getX(), player.getBodyY(0.5), player.getZ(),
                         s.form ? 40 : 15, 0.35, 0.7, 0.35, 0.03);
                 s.markDirty();
             }
             case VaporPayloads.Ability.TOGGLE_TIME -> {
-                if (!s.time && !player.getAbilities().creativeMode && player.getHungerManager().getFoodLevel() <= 2) {
+                boolean costsHunger = stats.timeHungerCost > 0f;
+                if (!s.time && costsHunger && !player.getAbilities().creativeMode
+                        && player.getHungerManager().getFoodLevel() <= 2) {
                     player.sendMessage(Text.translatable("message.vaporous.too_hungry").formatted(Formatting.GRAY), true);
                     return;
                 }
                 s.time = !s.time;
                 world.playSound(null, player.getX(), player.getY(), player.getZ(),
                         s.time ? SoundEvents.BLOCK_BEACON_DEACTIVATE : SoundEvents.BLOCK_BEACON_ACTIVATE,
-                        SoundCategory.PLAYERS, 1.0f, s.time ? 0.5f : 1.6f);
+                        SoundCategory.PLAYERS, 1.0f, s.time ? (variant == Variant.PLASMA ? 0.35f : 0.5f) : 1.6f);
                 s.markDirty();
             }
             case VaporPayloads.Ability.PRESSURE_BLAST -> {
-                if (pressureAllowed(s, player)) PressureAbilities.blast(player, s, charge);
-            }
-            case VaporPayloads.Ability.VACUUM -> {
-                if (pressureAllowed(s, player)) PressureAbilities.vacuum(player, s, charge);
+                if (pressureAllowed(s, player)) PressureAbilities.blast(player, s, charge, variant);
             }
             default -> {
             }
         }
     }
 
-    /**
-     * Compressing air takes either slowed time (then even standing still is fine) or real speed.
-     */
+    /** Compressing air takes either slowed time (then even standing still is fine) or real speed. */
     private static boolean pressureAllowed(SpeedsterState s, ServerPlayerEntity player) {
         if (TimeDilation.SERVER.active()) return true;
         // small tolerance for network lag between the client's check and ours
@@ -183,12 +204,15 @@ public final class SpeedsterManager {
         int desiredFactor = 1;
 
         for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
-            if (!isPowered(p)) continue;
+            int variant = variant(p);
+            if (variant == Variant.NONE) continue;
+            VaporConfig.FormStats stats = c.stats(variant);
             SpeedsterState s = state(p);
             if (!s.form) s.vapor = 0f;
 
+            trackMotion(p, s);
+
             if (s.blastCooldown > 0) s.blastCooldown--;
-            if (s.vacuumCooldown > 0) s.vacuumCooldown--;
 
             VaporAttributes.applyServer(p, s.form, s.vapor);
 
@@ -198,11 +222,15 @@ public final class SpeedsterManager {
             }
             s.floating = false;
 
+            if (c.fastPickup && p.isAlive() && !p.isSpectator()) {
+                FastPickup.collect(p, s, c);
+            }
+
             boolean creative = p.getAbilities().creativeMode || p.isSpectator();
             if (!creative) {
-                if (s.form) p.addExhaustion(c.speedHungerCost * (0.3f + s.vapor));
-                if (s.time) {
-                    p.addExhaustion(c.timeHungerCost);
+                if (s.form && stats.speedHungerCost > 0f) p.addExhaustion(stats.speedHungerCost * (0.3f + s.vapor));
+                if (s.time && stats.timeHungerCost > 0f) {
+                    p.addExhaustion(stats.timeHungerCost);
                     if (p.getHungerManager().getFoodLevel() <= 0) {
                         s.time = false;
                         s.markDirty();
@@ -212,9 +240,9 @@ public final class SpeedsterManager {
             }
 
             if (s.time && p.isAlive()) {
-                int f = c.baseTimeFactor;
+                int f = stats.baseTimeFactor;
                 if (c.timeScalesWithSpeed) {
-                    f += Math.round(s.vapor * (c.maxTimeFactor - c.baseTimeFactor));
+                    f += Math.round(s.vapor * (stats.maxTimeFactor - stats.baseTimeFactor));
                 }
                 desiredFactor = Math.max(desiredFactor, f);
             }
@@ -226,6 +254,17 @@ public final class SpeedsterManager {
         }
 
         updateTimeFactor(server, desiredFactor);
+    }
+
+    /** Measures how the player actually moved this tick (the server doesn't otherwise know a player's velocity). */
+    private static void trackMotion(ServerPlayerEntity p, SpeedsterState s) {
+        Vec3d pos = p.getPos();
+        if (s.lastPos != null) {
+            Vec3d delta = pos.subtract(s.lastPos);
+            if (delta.lengthSquared() > 15.0 * 15.0) delta = Vec3d.ZERO; // a teleport, not running
+            s.motion = s.motion.lerp(delta, 0.6);
+        }
+        s.lastPos = pos;
     }
 
     private static void updateTimeFactor(MinecraftServer server, int desired) {
@@ -257,7 +296,7 @@ public final class SpeedsterManager {
     // ------------------------------------------------------------------ sync
 
     private static VaporPayloads.VaporState payload(ServerPlayerEntity p, SpeedsterState s) {
-        return new VaporPayloads.VaporState(p.getId(), isPowered(p), s.form, s.time, s.vapor);
+        return new VaporPayloads.VaporState(p.getId(), variant(p), s.form, s.time, s.vapor);
     }
 
     private static void broadcast(ServerPlayerEntity p, SpeedsterState s) {
@@ -269,36 +308,5 @@ public final class SpeedsterManager {
         s.lastSentVapor = s.vapor;
         s.ticksSinceSync = 0;
         s.dirty = false;
-    }
-
-    // ------------------------------------------------------------------ momentum combat
-
-    private static ActionResult onAttack(PlayerEntity player, World world, Hand hand, Entity target, @Nullable EntityHitResult hit) {
-        if (world.isClient || !(player instanceof ServerPlayerEntity sp) || player.isSpectator()) return ActionResult.PASS;
-        SpeedsterState s = STATES.get(sp.getUuid());
-        if (s == null || !s.form || !isPowered(sp)) return ActionResult.PASS;
-
-        VaporConfig c = VaporConfig.get();
-        // A speedster's blows land faster than the target can recover.
-        if (c.flurryIgnoresIFrames && target instanceof LivingEntity) {
-            target.timeUntilRegen = 0;
-        }
-
-        // Carry momentum into the strike: the faster you're moving, the harder you throw them.
-        if (s.vapor > 0.15f && target.isAttackable()) {
-            Vec3d dir = sp.getRotationVector().multiply(1.0, 0.0, 1.0);
-            if (dir.lengthSquared() > 1.0E-4) {
-                dir = dir.normalize();
-                double k = s.vapor * c.momentumKnockback * 0.55;
-                target.addVelocity(dir.x * k, 0.12 + 0.25 * s.vapor, dir.z * k);
-                target.velocityModified = true;
-            }
-            ServerWorld sw = sp.getServerWorld();
-            sw.spawnParticles(VaporRegistry.VAPOR, target.getX(), target.getBodyY(0.5), target.getZ(),
-                    6 + (int) (14 * s.vapor), 0.25, 0.35, 0.25, 0.06);
-            sw.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP,
-                    SoundCategory.PLAYERS, 0.5f + 0.5f * s.vapor, 1.5f - 0.5f * s.vapor);
-        }
-        return ActionResult.PASS;
     }
 }

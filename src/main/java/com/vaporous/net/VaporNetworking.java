@@ -1,5 +1,6 @@
 package com.vaporous.net;
 
+import com.vaporous.power.ProjectileCatching;
 import com.vaporous.power.SpeedsterManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -12,6 +13,8 @@ public final class VaporNetworking {
     public static void registerPayloads() {
         PayloadTypeRegistry.playC2S().register(VaporPayloads.Ability.ID, VaporPayloads.Ability.CODEC);
         PayloadTypeRegistry.playC2S().register(VaporPayloads.VaporReport.ID, VaporPayloads.VaporReport.CODEC);
+        PayloadTypeRegistry.playC2S().register(VaporPayloads.Catch.ID, VaporPayloads.Catch.CODEC);
+        PayloadTypeRegistry.playC2S().register(VaporPayloads.Throw.ID, VaporPayloads.Throw.CODEC);
         PayloadTypeRegistry.playS2C().register(VaporPayloads.VaporState.ID, VaporPayloads.VaporState.CODEC);
         PayloadTypeRegistry.playS2C().register(VaporPayloads.TimeFactor.ID, VaporPayloads.TimeFactor.CODEC);
     }
@@ -24,6 +27,14 @@ public final class VaporNetworking {
         ServerPlayNetworking.registerGlobalReceiver(VaporPayloads.VaporReport.ID, (payload, context) -> {
             ServerPlayerEntity player = context.player();
             player.server.execute(() -> SpeedsterManager.handleVaporReport(player, payload.vapor(), payload.floating()));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(VaporPayloads.Catch.ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            player.server.execute(() -> ProjectileCatching.tryCatch(player, payload.entityId()));
+        });
+        ServerPlayNetworking.registerGlobalReceiver(VaporPayloads.Throw.ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            player.server.execute(() -> ProjectileCatching.throwArrow(player, payload.charge(), payload.offhand()));
         });
     }
 

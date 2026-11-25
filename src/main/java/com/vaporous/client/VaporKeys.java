@@ -13,11 +13,11 @@ import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * V – toggle vapor form (the speed power)
+ * V – toggle the speed form
  * Z – toggle time dilation
- * R – hold to compress, release to fire a Pressure Jet (sneak + look down to jet upward)
- * G – hold to compress, release to open a Vacuum Well (sneak to open it right in front of you)
- * R and G need either slowed time (standing still is fine) or real speed (density 50% or lower).
+ * R – hold to compress, release to fire a Pressure Jet (sneak + look down to jet upward).
+ *     Needs either slowed time (standing still is fine) or real speed (density 50% or lower).
+ * Right-click catching and arrow throwing live in ProjectileHands.
  * All rebindable under Options > Controls > Key Binds > Vaporous.
  */
 public final class VaporKeys {
@@ -26,10 +26,8 @@ public final class VaporKeys {
     public static KeyBinding form;
     public static KeyBinding time;
     public static KeyBinding blast;
-    public static KeyBinding vacuum;
 
     public static int blastHold;
-    public static int vacuumHold;
     /** Ticks left to show the "not fast enough" hint. */
     public static int needSpeedHint;
     private static int blastCooldown;
@@ -40,7 +38,6 @@ public final class VaporKeys {
         form = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.vaporous.form", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_V, "category.vaporous"));
         time = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.vaporous.time", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_Z, "category.vaporous"));
         blast = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.vaporous.blast", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.vaporous"));
-        vacuum = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.vaporous.vacuum", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G, "category.vaporous"));
     }
 
     static void handle(MinecraftClient mc, ClientPlayerEntity p) {
@@ -50,7 +47,6 @@ public final class VaporKeys {
             while (form.wasPressed()) { /* swallow */ }
             while (time.wasPressed()) { /* swallow */ }
             blastHold = 0;
-            vacuumHold = 0;
             return;
         }
 
@@ -62,10 +58,9 @@ public final class VaporKeys {
 
         // Compressing air needs either slowed time (then standing still is fine) or real speed.
         boolean pressureReady = pressureAllowed();
-        if (canCharge && !pressureReady && (blast.isPressed() || vacuum.isPressed())) {
+        if (canCharge && !pressureReady && blast.isPressed()) {
             needSpeedHint = 30;
             blastHold = 0;
-            vacuumHold = 0;
         }
 
         if (canCharge && pressureReady && blast.isPressed()) {
@@ -84,14 +79,6 @@ public final class VaporKeys {
                     p.fallDistance = 0f;
                 }
             }
-        }
-
-        if (canCharge && pressureReady && vacuum.isPressed()) {
-            vacuumHold = Math.min(vacuumHold + 1, MAX_CHARGE_TICKS);
-        } else if (vacuumHold > 0) {
-            float charge = vacuumHold / (float) MAX_CHARGE_TICKS;
-            vacuumHold = 0;
-            send(VaporPayloads.Ability.VACUUM, charge);
         }
     }
 

@@ -1,5 +1,5 @@
 {
-  "message_id": "vaporous.vacuum_collapse",
+  "message_id": "vaporous.kinetic_impact",
   "exhaustion": 0.1,
   "scaling": "when_caused_by_living_non_player"
 }

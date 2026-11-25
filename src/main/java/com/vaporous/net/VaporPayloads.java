@@ -11,12 +11,11 @@ public final class VaporPayloads {
 
     // ----------------------------------------------------------------- client -> server
 
-    /** A key press: toggle vapor form, toggle time dilation, or fire a pressure attack. */
+    /** A key press: toggle the speed form, toggle time dilation, or fire the Pressure Jet. */
     public record Ability(int ability, float charge) implements CustomPayload {
         public static final int TOGGLE_FORM = 0;
         public static final int TOGGLE_TIME = 1;
         public static final int PRESSURE_BLAST = 2;
-        public static final int VACUUM = 3;
 
         public static final Id<Ability> ID = new Id<>(Vaporous.id("ability"));
         public static final PacketCodec<RegistryByteBuf, Ability> CODEC = PacketCodec.tuple(
@@ -48,14 +47,41 @@ public final class VaporPayloads {
         }
     }
 
+    /** Right-clicked a projectile in slowed time: snatch it out of the air. */
+    public record Catch(int entityId) implements CustomPayload {
+        public static final Id<Catch> ID = new Id<>(Vaporous.id("catch"));
+        public static final PacketCodec<RegistryByteBuf, Catch> CODEC = PacketCodec.tuple(
+                PacketCodecs.VAR_INT, Catch::entityId,
+                Catch::new);
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+    /** Released a charged arrow throw (charge 0..1) from the main hand or off hand. */
+    public record Throw(float charge, boolean offhand) implements CustomPayload {
+        public static final Id<Throw> ID = new Id<>(Vaporous.id("throw"));
+        public static final PacketCodec<RegistryByteBuf, Throw> CODEC = PacketCodec.tuple(
+                PacketCodecs.FLOAT, Throw::charge,
+                PacketCodecs.BOOL, Throw::offhand,
+                Throw::new);
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
     // ----------------------------------------------------------------- server -> client
 
-    /** State of one speedster, sent to that player and everyone who can see them. */
-    public record VaporState(int entityId, boolean powered, boolean form, boolean time, float vapor) implements CustomPayload {
+    /** State of one speedster (variant 0 = not a speedster), sent to that player and everyone who can see them. */
+    public record VaporState(int entityId, int variant, boolean form, boolean time, float vapor) implements CustomPayload {
         public static final Id<VaporState> ID = new Id<>(Vaporous.id("vapor_state"));
         public static final PacketCodec<RegistryByteBuf, VaporState> CODEC = PacketCodec.tuple(
                 PacketCodecs.VAR_INT, VaporState::entityId,
-                PacketCodecs.BOOL, VaporState::powered,
+                PacketCodecs.VAR_INT, VaporState::variant,
                 PacketCodecs.BOOL, VaporState::form,
                 PacketCodecs.BOOL, VaporState::time,
                 PacketCodecs.FLOAT, VaporState::vapor,

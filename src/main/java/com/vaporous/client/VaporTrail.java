@@ -5,6 +5,9 @@ import com.vaporous.VaporRegistry;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.particle.SimpleParticleType;
+import com.vaporous.power.Variant;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
@@ -27,22 +30,26 @@ public final class VaporTrail {
             boolean self = pl == mc.player;
             boolean form;
             float vapor;
+            int variant;
             if (self) {
                 form = ClientVaporState.powered && ClientVaporState.form;
                 vapor = ClientVaporState.vapor;
+                variant = ClientVaporState.variant;
             } else {
                 ClientVaporState.Remote r = ClientVaporState.remote(pl.getId());
                 if (r == null) continue;
                 form = r.form();
                 vapor = r.vapor();
+                variant = r.variant();
             }
             if (!form || pl.isSpectator() || pl.isInvisible()) continue;
-            emit(mc, world, pl, self, vapor, c);
+            emit(mc, world, pl, self, vapor, variant == Variant.PLASMA, c);
         }
     }
 
     private static void emit(MinecraftClient mc, ClientWorld world, AbstractClientPlayerEntity pl,
-                             boolean self, float vapor, VaporConfig c) {
+                             boolean self, float vapor, boolean plasma, VaporConfig c) {
+        SimpleParticleType type = plasma ? VaporRegistry.PLASMA : VaporRegistry.VAPOR;
         Vec3d cur = pl.getPos();
         Vec3d prev = new Vec3d(pl.prevX, pl.prevY, pl.prevZ);
         Vec3d motion = cur.subtract(prev);
@@ -50,8 +57,10 @@ public final class VaporTrail {
         if (dist > 12.0) return; // teleported, not ran
 
         double speedFactor = MathHelper.clamp(dist * 4.0, 0.0, 6.0);
-        int count = (int) Math.round(c.trailDensity * (1.2 + speedFactor * 5.0 + vapor * 6.0));
-        count = Math.min(count, 70);
+        // Plasma burns out faster, so it's laid down denser to keep a solid, glowing ribbon.
+        double density = c.trailDensity * (plasma ? 1.5 : 1.0);
+        int count = (int) Math.round(density * (1.2 + speedFactor * 5.0 + vapor * 6.0));
+        count = Math.min(count, plasma ? 100 : 70);
 
         Vec3d dir = dist > 1.0E-4 ? motion.multiply(1.0 / dist) : Vec3d.ZERO;
         boolean firstPerson = self && mc.options.getPerspective().isFirstPerson();
@@ -74,7 +83,14 @@ public final class VaporTrail {
             double vx = -dir.x * 0.03 * speedFactor + (r.nextDouble() - 0.5) * 0.02;
             double vy = 0.004 + r.nextDouble() * 0.014;
             double vz = -dir.z * 0.03 * speedFactor + (r.nextDouble() - 0.5) * 0.02;
-            world.addParticle(VaporRegistry.VAPOR, base.x + ox, base.y + oy, base.z + oz, vx, vy, vz);
+            world.addParticle(type, base.x + ox, base.y + oy, base.z + oz, vx, vy, vz);
+        }
+        // Plasma crackles: a few stray sparks thrown off the body.
+        if (plasma && r.nextFloat() < 0.25f + 0.5f * vapor) {
+            Vec3d at = prev.lerp(cur, r.nextDouble());
+            world.addParticle(ParticleTypes.ELECTRIC_SPARK,
+                    at.x + (r.nextDouble() - 0.5) * w * 1.4, at.y + r.nextDouble() * h, at.z + (r.nextDouble() - 0.5) * w * 1.4,
+                    (r.nextDouble() - 0.5) * 0.3, r.nextDouble() * 0.2, (r.nextDouble() - 0.5) * 0.3);
         }
     }
 }

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "vaporous:living_mist_phial" },
+    { "item": "minecraft:nether_star" },
+    { "item": "minecraft:blaze_rod" },
+    { "item": "minecraft:glowstone_dust" },
+    { "item": "minecraft:amethyst_shard" }
+  ],
+  "result": {
+    "id": "vaporous:living_plasma_phial",
+    "count": 1
+  }
+}

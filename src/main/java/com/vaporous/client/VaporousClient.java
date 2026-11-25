@@ -14,7 +14,8 @@ public class VaporousClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        ParticleFactoryRegistry.getInstance().register(VaporRegistry.VAPOR, VaporParticle.Factory::new);
+        ParticleFactoryRegistry.getInstance().register(VaporRegistry.VAPOR, VaporParticle.Factory::vapor);
+        ParticleFactoryRegistry.getInstance().register(VaporRegistry.PLASMA, VaporParticle.Factory::plasma);
         VaporKeys.register();
 
         ClientPlayNetworking.registerGlobalReceiver(VaporPayloads.VaporState.ID, (payload, context) ->

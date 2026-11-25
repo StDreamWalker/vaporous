@@ -1,6 +1,7 @@
 package com.vaporous.client;
 
 import com.vaporous.VaporConfig;
+import com.vaporous.power.Variant;
 import com.vaporous.time.TimeDilation;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -14,10 +15,21 @@ public final class VaporHud {
     private static final double MPH_PER_BPS = 2.23694;   // 1 block = 1 metre
     private static final double KMH_PER_BPS = 3.6;
     private static final double MACH_BPS = 343.0;        // speed of sound, m/s
-    /** The dial's top end. Log scale, so walking, sprinting and supersonic all fit. */
-    private static final double DIAL_MAX_MPH = 3000.0;
-    /** Past this the dial turns cyan: speeds you can only reach relative to slowed time. */
-    private static final double DIAL_REALSPEED_MPH = 150.0;
+    /** The dial's top end. Log scale, so walking, sprinting and hypersonic all fit. */
+    private static final double DIAL_MAX_MPH = 30000.0;
+    /** Past this the dial changes colour: speeds you can only reach relative to slowed time. */
+    private static final double VAPOR_REALSPEED_MPH = 150.0;
+    private static final double PLASMA_REALSPEED_MPH = 330.0;
+
+    /** Colour theme for the phial the player drank. */
+    private record Theme(int accent, int lit, int beyondLit, int beyondDim, int needle, int needleBeyond, int vaporBar, int formText) {
+        static final Theme VAPOR = new Theme(0xFF6FE3FF, 0xFFE6F2FA, 0xFF6FE3FF, 0x553A6A80, 0xFFFF6B5A, 0xFF9FF0FF, 0xFFA9C6DA, 0xD8ECF7);
+        static final Theme PLASMA = new Theme(0xFFC77DFF, 0xFFF4EAFF, 0xFFE38BFF, 0x55603A80, 0xFF7FE7FF, 0xFFFFFFFF, 0xFFB98CFF, 0xF0D6FF);
+    }
+
+    private static Theme theme() {
+        return ClientVaporState.variant == Variant.PLASMA ? Theme.PLASMA : Theme.VAPOR;
+    }
 
     private VaporHud() {}
 
@@ -41,12 +53,15 @@ public final class VaporHud {
         int x = 8;
         int y = h - 34;
         float vapor = ClientVaporState.vapor;
+        Theme theme = theme();
+        boolean plasma = ClientVaporState.variant == Variant.PLASMA;
 
         // Mode readout
-        Text formText = Text.translatable(ClientVaporState.flying ? "hud.vaporous.flying"
-                : ClientVaporState.form ? "hud.vaporous.form_on" : "hud.vaporous.form_off");
-        ctx.drawTextWithShadow(font, formText, x, y - 24,
-                ClientVaporState.flying ? 0xFFFFFF : ClientVaporState.form ? 0xD8ECF7 : 0x7F8C99);
+        String formKey = ClientVaporState.flying ? "hud.vaporous.flying"
+                : ClientVaporState.form ? (plasma ? "hud.vaporous.plasma_on" : "hud.vaporous.form_on")
+                : "hud.vaporous.form_off";
+        ctx.drawTextWithShadow(font, Text.translatable(formKey), x, y - 24,
+                ClientVaporState.flying ? 0xFFFFFF : ClientVaporState.form ? theme.formText() : 0x7F8C99);
         if (ClientVaporState.time) {
             Text timeText = Text.translatable("hud.vaporous.time", TimeDilation.CLIENT.factor());
             ctx.drawTextWithShadow(font, timeText, x, y - 13, 0x9FD3FF);
@@ -57,9 +72,9 @@ public final class VaporHud {
         ctx.fill(x - 1, y - 1, x + barW + 1, y + 6, 0xA0000000);
         int vaporW = Math.round(barW * vapor);
         ctx.fill(x, y, x + barW - vaporW, y + 5, 0xFF5C6E7E);
-        ctx.fillGradient(x + barW - vaporW, y, x + barW, y + 5, 0xFFF2F8FF, 0xFFA9C6DA);
+        ctx.fillGradient(x + barW - vaporW, y, x + barW, y + 5, 0xFFF2F8FF, theme.vaporBar());
         int flightMark = x + Math.round(barW * (1f - (float) c.flightVapor));
-        ctx.fill(flightMark, y - 2, flightMark + 1, y + 7, 0xFF6FE3FF);
+        ctx.fill(flightMark, y - 2, flightMark + 1, y + 7, theme.accent());
         String pct = Math.round((1f - vapor) * 100f) + "%";
         ctx.drawTextWithShadow(font, Text.translatable("hud.vaporous.density", pct), x, y + 8, 0xB8C7D3);
 
@@ -68,7 +83,9 @@ public final class VaporHud {
         // Charge meters
         int cy = h / 2 + 14;
         if (VaporKeys.blastHold > 0) drawCharge(ctx, font, w / 2, cy, VaporKeys.blastHold, "hud.vaporous.charge_blast");
-        if (VaporKeys.vacuumHold > 0) drawCharge(ctx, font, w / 2, cy + 14, VaporKeys.vacuumHold, "hud.vaporous.charge_vacuum");
+        if (ProjectileHands.throwHold > 0) {
+            drawBar(ctx, font, w / 2, cy + 14, ProjectileHands.throwCharge(), "hud.vaporous.charge_throw");
+        }
         if (VaporKeys.needSpeedHint > 0) {
             Text hint = Text.translatable("hud.vaporous.need_speed");
             ctx.drawTextWithShadow(font, hint, w / 2 - font.getWidth(hint) / 2, cy, 0xC0CCD6);
@@ -80,6 +97,8 @@ public final class VaporHud {
     private static void drawSpeedometer(DrawContext ctx, TextRenderer font, int w, int h, VaporConfig c) {
         int factor = TimeDilation.CLIENT.factor();
         boolean slowed = factor > 1;
+        Theme theme = theme();
+        double realLimitMph = ClientVaporState.variant == Variant.PLASMA ? PLASMA_REALSPEED_MPH : VAPOR_REALSPEED_MPH;
         double bps = ClientVaporState.perceivedSpeed;
         double mph = bps * MPH_PER_BPS;
 
@@ -90,13 +109,13 @@ public final class VaporHud {
         ctx.fill(cx - r - 7, cy - r - 7, cx + r + 7, cy + 26, 0x78000000);
         if (slowed) {
             // a cold rim while time is dilated
-            ctx.fill(cx - r - 7, cy - r - 7, cx + r + 7, cy - r - 6, 0xFF6FE3FF);
-            ctx.fill(cx - r - 7, cy + 25, cx + r + 7, cy + 26, 0xFF6FE3FF);
+            ctx.fill(cx - r - 7, cy - r - 7, cx + r + 7, cy - r - 6, theme.accent());
+            ctx.fill(cx - r - 7, cy + 25, cx + r + 7, cy + 26, theme.accent());
         }
 
         double logMax = Math.log10(1.0 + DIAL_MAX_MPH);
         double frac = Math.min(1.0, Math.log10(1.0 + mph) / logMax);
-        double realLimit = Math.log10(1.0 + DIAL_REALSPEED_MPH) / logMax;
+        double realLimit = Math.log10(1.0 + realLimitMph) / logMax;
 
         // Dial: half circle from the left, over the top, to the right.
         int segments = 36;
@@ -108,14 +127,14 @@ public final class VaporHud {
             boolean lit = f <= frac;
             boolean beyond = f > realLimit;
             int color = lit
-                    ? (beyond ? 0xFF6FE3FF : 0xFFE6F2FA)
-                    : (beyond ? 0x553A6A80 : 0x55556677);
+                    ? (beyond ? theme.beyondLit() : theme.lit())
+                    : (beyond ? theme.beyondDim() : 0x55556677);
             ctx.fill(sx - 2, sy - 2, sx + 2, sy + 2, color);
         }
 
         // Needle
         double needle = Math.PI + frac * Math.PI;
-        int needleColor = frac > realLimit ? 0xFF9FF0FF : 0xFFFF6B5A;
+        int needleColor = frac > realLimit ? theme.needleBeyond() : theme.needle();
         for (int i = 3; i < r - 5; i++) {
             int nx = cx + (int) Math.round(Math.cos(needle) * i);
             int ny = cy + (int) Math.round(Math.sin(needle) * i);
@@ -128,7 +147,7 @@ public final class VaporHud {
         ctx.getMatrices().push();
         ctx.getMatrices().translate((float) cx, (float) (cy + 5), 0f);
         ctx.getMatrices().scale(1.5f, 1.5f, 1f);
-        ctx.drawTextWithShadow(font, value, -font.getWidth(value) / 2, 0, slowed ? 0x9FF0FF : 0xFFFFFF);
+        ctx.drawTextWithShadow(font, value, -font.getWidth(value) / 2, 0, slowed ? (theme.accent() & 0xFFFFFF) : 0xFFFFFF);
         ctx.getMatrices().pop();
 
         Text unit = Text.translatable("hud.vaporous.unit." + unitKey(c.speedUnits));
@@ -138,7 +157,7 @@ public final class VaporHud {
         int topY = cy - r - 18;
         if (slowed) {
             Text perceived = Text.translatable("hud.vaporous.perceived", factor);
-            ctx.drawTextWithShadow(font, perceived, cx - font.getWidth(perceived) / 2, topY, 0x6FE3FF);
+            ctx.drawTextWithShadow(font, perceived, cx - font.getWidth(perceived) / 2, topY, theme.accent() & 0xFFFFFF);
             topY -= 10;
         }
         double mach = bps / MACH_BPS;
@@ -169,8 +188,11 @@ public final class VaporHud {
     }
 
     private static void drawCharge(DrawContext ctx, TextRenderer font, int cx, int y, int hold, String key) {
+        drawBar(ctx, font, cx, y, hold / (float) VaporKeys.MAX_CHARGE_TICKS, key);
+    }
+
+    private static void drawBar(DrawContext ctx, TextRenderer font, int cx, int y, float f, String key) {
         int bw = 60;
-        float f = hold / (float) VaporKeys.MAX_CHARGE_TICKS;
         ctx.fill(cx - bw / 2 - 1, y - 1, cx + bw / 2 + 1, y + 4, 0xA0000000);
         ctx.fill(cx - bw / 2, y, cx - bw / 2 + Math.round(bw * f), y + 3, f >= 1f ? 0xFFFFFFFF : 0xFFBFDFF2);
         Text label = Text.translatable(key);
