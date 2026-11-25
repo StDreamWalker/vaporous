@@ -4,6 +4,12 @@ pluginManagement {
             name = 'Fabric'
             url = 'https://maven.fabricmc.net/'
         }
+        // Google's mirror of Maven Central, tried first: Maven Central often rate-limits
+        // shared build machines (GitHub Actions) with "429 Too Many Requests".
+        maven {
+            name = 'MavenCentralMirror'
+            url = 'https://maven-central.storage-download.googleapis.com/maven2/'
+        }
         mavenCentral()
         gradlePluginPortal()
     }

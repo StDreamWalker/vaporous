@@ -11,6 +11,11 @@ base {
 }
 
 repositories {
+    // Mirror of Maven Central first, to avoid "429 Too Many Requests" on shared build machines.
+    maven {
+        name = 'MavenCentralMirror'
+        url = 'https://maven-central.storage-download.googleapis.com/maven2/'
+    }
 }
 
 dependencies {

@@ -9,7 +9,16 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: chmod +x gradlew && ./gradlew build
+          cache: gradle
+      - name: Build (retries if a download server is busy)
+        run: |
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            ./gradlew build --no-daemon && exit 0
+            echo "Build attempt $attempt failed - waiting before retrying..."
+            sleep $((attempt * 45))
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: vaporous-jar
