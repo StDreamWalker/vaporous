@@ -17,7 +17,12 @@ import java.nio.file.Path;
  */
 public final class VaporConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    /** Bumped when default values change, so older config files pick up the new defaults. */
+    private static final int CURRENT_VERSION = 2;
     private static VaporConfig instance = new VaporConfig();
+
+    /** Don't edit: used to upgrade older config files. */
+    public int configVersion = 0;
 
     /** Stats that differ between the two phials. */
     public static final class FormStats {
@@ -102,8 +107,8 @@ public final class VaporConfig {
     public float takeoffPitch = 12f;
 
     // ---------- Momentum combat (server) ----------
-    /** Extra melee damage at 100% vapor. */
-    public double momentumDamage = 8.0;
+    /** Extra melee damage at 100% vapor (kinetic damage below does the heavy lifting at speed). */
+    public double momentumDamage = 4.0;
     /** Extra melee knockback at 100% vapor (used when you're not charging forward). */
     public double momentumKnockback = 2.5;
     /** Extra attack speed at 100% vapor (vanilla base is 4.0). */
@@ -114,31 +119,62 @@ public final class VaporConfig {
     public double safeFallBonus = 14.0;
     /** Newton's cradle: hitting something while moving forward hands it your momentum. */
     public boolean cradleStrikes = true;
-    /** Minimum forward speed (blocks/tick; 0.35 = 7 blocks/s) for a cradle strike. */
+    /**
+     * Minimum forward speed for a cradle strike, in blocks per world tick (0.35 = 7 blocks/s).
+     * Speeds are measured relative to the world: in 1/20 time you are moving 20x faster as far as
+     * the world is concerned, so even a jog counts.
+     */
     public double cradleMinSpeed = 0.35;
+    /**
+     * Kinetic damage from a moving strike: this x (relative speed in blocks/tick)^2, like kinetic energy.
+     * A full vapor sprint (3 blocks/tick) adds ~5; the same sprint in 1/20 time (60 blocks/tick) hits the cap.
+     */
+    public double kineticDamageScale = 0.6;
+    /** Ceiling for one strike's kinetic damage. */
+    public double maxKineticDamage = 1000.0;
     /** Share of your momentum handed to the target (1.0 = all of it, like a Newton's cradle). */
     public double cradleTransfer = 1.0;
     /** Upward lift added to launched targets so they leave the ground. */
     public double cradleLift = 0.25;
-    /** Speed cap for anything launched (blocks/tick). */
-    public double maxLaunchSpeed = 6.0;
+    /** Extra lift per block/tick of launch speed, so harder hits send things on a long arc instead of skidding. */
+    public double launchLiftPerSpeed = 0.12;
+    /** Most upward lift a launch can add (blocks/tick). */
+    public double maxLaunchLift = 2.5;
+    /** Speed cap for anything launched (blocks per world tick). */
+    public double maxLaunchSpeed = 12.0;
     /** Launched creatures that slam into a block faster than this (blocks/tick) take kinetic damage. */
     public double impactMinSpeed = 0.5;
     /** Kinetic damage per block/tick of impact speed above the minimum. */
     public double impactDamagePerSpeed = 8.0;
     /** A launched creature that hits another creature passes the momentum on, like a cradle. */
     public boolean cradleChains = true;
-    /** Share of your forward speed added to anything you shoot or throw. */
+    /** Share of your forward speed (relative to the world) added to anything you shoot or throw. */
     public double projectileMomentum = 1.0;
+    /** Fastest a projectile can be sped up to (blocks per world tick; a full bow shot is 3). */
+    public double maxProjectileSpeed = 12.0;
+    /** Arrow/trident damage multiplier from momentum: 1 + this x (added speed)^2. */
+    public double projectileKineticScale = 0.15;
+    public double maxProjectileDamageMultiplier = 20.0;
+    /** Share of a momentum-charged projectile's speed handed to whatever it hits. */
+    public double projectileTransfer = 0.6;
+
+    // ---------- Time dilation contact ----------
+    /** Touching or hitting a mob in slowed time makes you untouchable by mobs for this many real ticks (20 = 1 s). */
+    public int dilationContactImmunityTicks = 20;
 
     // ---------- Catching & throwing (server + client) ----------
     /** How far away (blocks) you can snatch a projectile out of the air while time is dilated. */
     public double catchRange = 6.0;
     /** Ticks of holding right-click for a full-power arrow throw (a trident needs 10). */
     public int throwChargeTicks = 20;
-    /** Arrow throw speed with no charge, and extra speed at full charge (a full bow shot is 3.0). */
-    public float throwBaseSpeed = 1.2f;
-    public float throwChargeSpeed = 2.0f;
+    /**
+     * Arrow throw speed with no charge, and extra speed at full charge (a full bow shot is 3.0).
+     * A standing throw is deliberately weak; running (or slowed time) is what makes it hurt.
+     */
+    public float throwBaseSpeed = 0.5f;
+    public float throwChargeSpeed = 0.9f;
+    /** Base damage of a hand-thrown arrow (a bow arrow is 2.0). */
+    public double thrownArrowDamage = 1.0;
 
     // ---------- Item pickup ----------
     /** Speedsters scoop up items instantly, along the whole path they ran, even in slowed time. */
@@ -220,6 +256,7 @@ public final class VaporConfig {
             }
         }
         instance = loaded != null ? loaded : new VaporConfig();
+        instance.migrate();
         instance.sanitize();
         save(); // writes any newly-added fields back to disk
     }
@@ -233,6 +270,18 @@ public final class VaporConfig {
         } catch (IOException e) {
             Vaporous.LOGGER.error("Could not write vaporous.json", e);
         }
+    }
+
+    /** Older config files keep their saved values; move the ones whose defaults changed to the new defaults. */
+    private void migrate() {
+        if (configVersion < 2) {
+            VaporConfig d = new VaporConfig();
+            momentumDamage = d.momentumDamage;
+            maxLaunchSpeed = d.maxLaunchSpeed;
+            throwBaseSpeed = d.throwBaseSpeed;
+            throwChargeSpeed = d.throwChargeSpeed;
+        }
+        configVersion = CURRENT_VERSION;
     }
 
     private void sanitize() {
@@ -250,6 +299,8 @@ public final class VaporConfig {
         flightVapor = Math.max(0.05, Math.min(1.0, flightVapor));
         flightTurnRate = Math.max(0.01, Math.min(1.0, flightTurnRate));
         if (throwChargeTicks < 1) throwChargeTicks = 1;
-        if (maxLaunchSpeed > 9.0) maxLaunchSpeed = 9.0;
+        if (maxLaunchSpeed > 20.0) maxLaunchSpeed = 20.0;
+        if (maxProjectileSpeed > 20.0) maxProjectileSpeed = 20.0;
+        if (dilationContactImmunityTicks < 0) dilationContactImmunityTicks = 0;
     }
 }

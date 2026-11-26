@@ -20,6 +20,8 @@ public final class SpeedsterState {
     Vec3d lastPos;
 
     public int blastCooldown;
+    /** Real ticks left during which mobs can't hurt you (from contact in slowed time). */
+    public int mobImmuneTicks;
 
     float lastSentVapor = -1f;
     int ticksSinceSync;

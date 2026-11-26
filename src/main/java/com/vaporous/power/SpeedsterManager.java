@@ -9,12 +9,15 @@ import com.vaporous.net.VaporPayloads;
 import com.vaporous.time.TimeDilation;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -22,6 +25,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
@@ -80,6 +84,15 @@ public final class SpeedsterManager {
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             STATES.clear();
             TimeDilation.SERVER.reset();
+        });
+
+        // In slowed time, a mob you've just touched or hit can't land a blow on you.
+        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+            if (entity instanceof ServerPlayerEntity sp) {
+                SpeedsterState s = STATES.get(sp.getUuid());
+                if (s != null && s.mobImmuneTicks > 0 && source.getAttacker() instanceof MobEntity) return false;
+            }
+            return true;
         });
 
         PressureAbilities.init();
@@ -213,6 +226,14 @@ public final class SpeedsterManager {
             trackMotion(p, s);
 
             if (s.blastCooldown > 0) s.blastCooldown--;
+            if (s.mobImmuneTicks > 0) s.mobImmuneTicks--;
+            if (TimeDilation.SERVER.active() && p.isAlive() && !p.isSpectator()) {
+                // Running into a mob in slowed time: no mob could react that fast.
+                Box reach = p.getBoundingBox().expand(0.6);
+                if (!p.getServerWorld().getEntitiesByClass(MobEntity.class, reach, Entity::isAlive).isEmpty()) {
+                    s.mobImmuneTicks = Math.max(s.mobImmuneTicks, c.dilationContactImmunityTicks);
+                }
+            }
 
             VaporAttributes.applyServer(p, s.form, s.vapor);
 

@@ -17,7 +17,7 @@ Put `vaporous-0.1.0.jar` in `.minecraft/mods` with Fabric API.
 | | Phial of Living Mist | Phial of Living Plasma |
 |---|---|---|
 | Recipe (shapeless) | glass bottle + breeze rod + phantom membrane + sugar + feather | Phial of Living Mist + nether star + blaze rod + glowstone dust + amethyst shard |
-| Trail | thick, translucent grey-white vapor | the same dust wisps, self-lit and glowing: a white-hot core cooling through electric cyan to a violet fringe, flickering and throwing sparks |
+| Trail | thick, translucent grey-white vapor | the same dust wisps, self-lit and glowing: a white-hot flash that cools quickly through cyan to violet, then lingers as a long, flickering violet ribbon that throws sparks |
 | Top sprint | about 60 blocks/s (≈130 mph) | about 140 blocks/s (≈310 mph) |
 | Flight | about 60 blocks/s | about 120 blocks/s |
 | Time dilation | 1/8 → 1/20 as you speed up | 1/24 → 1/60 as you speed up |
@@ -42,10 +42,14 @@ Drinking the other phial switches you over. Ops can use `/vaporous grant [player
 \* **R needs speed or slowed time.** In normal time you can only compress air while you're already moving fast (density 50% or lower). With Time Dilation on, you can use it even standing still.
 
 ## Momentum
-- **Newton's cradle strikes.** Hit something while running forward and it takes your momentum, flying off in your direction of travel. Heavy, knockback-resistant mobs move less.
-- **Kinetic impact.** A launched creature that slams into a block hard enough takes damage. The harder it hits, the more damage, with block debris and a thud. This also applies to anything blown back by the Pressure Jet.
-- **Cradle chains.** A launched creature that crashes into another one hands the momentum on and stops short, just like the balls of a cradle.
-- **Projectiles.** Anything you shoot or throw while running forward gains your forward speed: bow and crossbow arrows, tridents, snowballs, pearls, potions and hand-thrown arrows. Arrow damage grows with arrow speed, so faster means harder hits. A fast projectile also hands its momentum to whatever it hits.
+All of these use your speed **relative to the world**. In 1/20 time, the world sees you move 20× faster, so a punch that reads Mach 2 on the speedometer lands like a Mach 2 punch.
+- **Kinetic strikes.** Hit something while moving forward and the hit adds damage that grows with the *square* of your speed, like kinetic energy. A full vapor sprint in normal time adds about 5. The same sprint in slowed time adds hundreds, so nothing ordinary survives it.
+- **Flung, not nudged.** The target takes your momentum and sails off on a long, high arc in your direction of travel, trailing vapor (or plasma) behind it. Harder hits throw higher and farther. Heavy, knockback-resistant mobs move less.
+- **Wall impact.** A flung creature that slams into a block hard enough takes impact damage, with debris and a thud. This also applies to anything blown back by the Pressure Jet.
+- **Cradle chains.** A flung creature that crashes into another one hands the momentum on and stops short, like the balls of a Newton's cradle.
+- **Projectiles.** Anything you shoot or throw while moving forward gains your speed. Arrows and tridents also get a kinetic damage bonus that grows with the square of the added speed. A fast projectile flings whatever it hits.
+- **Hand-thrown arrows** are weak when thrown standing still, about 1 heart at full wind-up. Throwing while running, and especially in slowed time, is what makes them deadly.
+- **Untouchable in slowed time.** Touching or hitting a mob while time is dilated makes you immune to mob damage for 1 second, refreshed as long as you stay in contact. Nothing could react that fast.
 - In vapor or plasma form, your melee hits ignore the target's invulnerability frames, so flurries land.
 
 ## Speedometer

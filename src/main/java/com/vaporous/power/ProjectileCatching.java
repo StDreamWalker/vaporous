@@ -77,6 +77,8 @@ public final class ProjectileCatching {
         float speed = c.throwBaseSpeed + c.throwChargeSpeed * charge;
         arrow.setVelocity(p, p.getPitch(), p.getYaw(), 0.0f, speed, 1.2f - charge);
         arrow.setCritical(charge >= 1.0f);
+        // A standing throw is weak; forward momentum (see MomentumCombat) is what makes it hurt.
+        arrow.setDamage(c.thrownArrowDamage);
         if (p.getAbilities().creativeMode) {
             arrow.pickupType = PersistentProjectileEntity.PickupPermission.CREATIVE_ONLY;
         } else {

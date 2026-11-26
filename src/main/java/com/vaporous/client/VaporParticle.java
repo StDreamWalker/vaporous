@@ -57,8 +57,8 @@ public class VaporParticle extends SpriteBillboardParticle {
             this.baseAlpha = c.plasmaAlpha * (0.75f + this.random.nextFloat() * 0.4f);
             this.baseScale = 0.07f + this.random.nextFloat() * 0.1f;
             this.growth = 1.3f;
-            this.maxAge = 12 + this.random.nextInt(14);
-            this.gravityStrength = -0.2f;     // hot: rises a little faster
+            this.maxAge = 32 + this.random.nextInt(26);  // lingers: a long glowing ribbon
+            this.gravityStrength = -0.1f;     // hot, rises gently (lives longer, so slower drift)
             this.velocityMultiplier = 0.84f;
             applyRamp(0f);
         } else {
@@ -117,7 +117,9 @@ public class VaporParticle extends SpriteBillboardParticle {
 
         float life = (float) this.age / (float) this.maxAge;
         float fadeIn = Math.min(1f, 0.35f + this.age / 3f);
-        float alphaNow = this.baseAlpha * (1f - life) * fadeIn;
+        // Plasma holds its glow longer before fading out.
+        float fade = plasma ? 1f - life * life : 1f - life;
+        float alphaNow = this.baseAlpha * fade * fadeIn;
         if (plasma) {
             applyRamp(life);
             float flicker = 0.75f + 0.25f * MathHelper.sin(this.age * 1.9f + this.flickerPhase);
@@ -126,19 +128,23 @@ public class VaporParticle extends SpriteBillboardParticle {
         this.alpha = alphaNow;
     }
 
-    /** White-hot core -> electric glow -> violet fringe as the wisp ages. */
+    /** White-hot core -> electric glow -> violet, reached early and held for the rest of the wisp's life. */
     private void applyRamp(float life) {
         int from;
         int to;
         float t;
-        if (life < 0.25f) {
+        if (life < 0.08f) {
             from = coreRgb;
             to = glowRgb;
-            t = life / 0.25f;
-        } else {
+            t = life / 0.08f;
+        } else if (life < 0.35f) {
             from = glowRgb;
             to = fringeRgb;
-            t = (life - 0.25f) / 0.75f;
+            t = (life - 0.08f) / 0.27f;
+        } else {
+            from = fringeRgb;
+            to = fringeRgb;
+            t = 0f;
         }
         float r = MathHelper.lerp(t, ((from >> 16) & 0xFF) / 255f, ((to >> 16) & 0xFF) / 255f);
         float g = MathHelper.lerp(t, ((from >> 8) & 0xFF) / 255f, ((to >> 8) & 0xFF) / 255f);

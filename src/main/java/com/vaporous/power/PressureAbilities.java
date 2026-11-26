@@ -70,7 +70,7 @@ public final class PressureAbilities {
             e.addVelocity(dir.x * push, dir.y * push * 0.6 + 0.2, dir.z * push);
             e.velocityModified = true;
             e.extinguish(); // a wall of compressed air snuffs flames
-            MomentumCombat.trackLaunch(e, e.getVelocity(), p.getUuid()); // slamming into a wall still hurts
+            MomentumCombat.trackLaunch(e, e.getVelocity(), p.getUuid(), wisp); // trails, and slamming into a wall still hurts
         }
 
         if (hit.getType() == HitResult.Type.BLOCK) {

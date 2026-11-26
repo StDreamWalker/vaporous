@@ -57,10 +57,9 @@ public final class VaporTrail {
         if (dist > 12.0) return; // teleported, not ran
 
         double speedFactor = MathHelper.clamp(dist * 4.0, 0.0, 6.0);
-        // Plasma burns out faster, so it's laid down denser to keep a solid, glowing ribbon.
-        double density = c.trailDensity * (plasma ? 1.5 : 1.0);
+        double density = c.trailDensity;
         int count = (int) Math.round(density * (1.2 + speedFactor * 5.0 + vapor * 6.0));
-        count = Math.min(count, plasma ? 100 : 70);
+        count = Math.min(count, 70);
 
         Vec3d dir = dist > 1.0E-4 ? motion.multiply(1.0 / dist) : Vec3d.ZERO;
         boolean firstPerson = self && mc.options.getPerspective().isFirstPerson();
